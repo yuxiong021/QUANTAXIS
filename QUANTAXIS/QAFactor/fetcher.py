@@ -24,9 +24,9 @@ from QUANTAXIS.QAFactor.utils import QA_fmt_code, QA_fmt_code_list
 from QUANTAXIS.QAFetch.QAQuery_Advance import QA_fetch_stock_list
 from QUANTAXIS.QAFetch.QATushare import get_pro
 from QUANTAXIS.QAUtil import (DATABASE, QASETTING, QA_util_date_int2str,
-                              QA_util_get_real_date,
                               QA_util_date_stamp, QA_util_get_pre_trade_date,
-                              QA_util_log_info, QA_util_to_json_from_pandas)
+                              QA_util_get_real_date, QA_util_log_info,
+                              QA_util_to_json_from_pandas)
 
 REPORT_DATE_TAILS = ["0331", "0630", "0930", "1231"]
 SHEET_TYPE = ["income", "balancesheet", "cashflow"]
@@ -921,7 +921,7 @@ def QA_fetch_daily_basic(
             }
     coll = DATABASE.daily_basic
     cursor = coll.find(qry)
-    df = pd.DataFram(cursor)
+    df = pd.DataFrame(cursor)
     if df.empty:
         return df
     df = df.rename(columns={"trade_date": "date"}).drop(
