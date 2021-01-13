@@ -572,7 +572,8 @@ def QA_fetch_last_financial(
                 df = pd.DataFrame(cursor).drop(columns="_id")[fields]
         except:
             raise ValueError("[QRY ERROR]")
-        # return df.groupby("code").apply(lambda x: x.iloc[0])
+        if sheet_type == "balancesheet":
+            return df.groupby("code").apply(lambda x: x.iloc[0])
         return df.groupby("code").apply(_trans_financial_type).unstack()
     if not report_label:
         qry = {
@@ -594,7 +595,8 @@ def QA_fetch_last_financial(
                 df = pd.DataFrame(cursor).drop(columns="_id")[fields]
         except:
             raise ValueError("[QRY ERROR]")
-        # return df.groupby("code").apply(lambda x: x.iloc[0])
+        if sheet_type == "balancesheet":
+            return df.groupby("code").apply(lambda x: x.iloc[0])
         return df.groupby("code").apply(_trans_financial_type).unstack()
     if not code:
         qry = {
@@ -617,7 +619,8 @@ def QA_fetch_last_financial(
                 df = pd.DataFrame(cursor).drop(columns="_id")[fields]
         except:
             raise ValueError("[QRY ERROR]")
-        # return df.groupby("code").apply(lambda x: x.iloc[0])
+        if sheet_type == "balancesheet":
+            return df.groupby("code").apply(lambda x: x.iloc[0])
         return df.groupby("code").apply(_trans_financial_type).unstack()
     else:
         qry = {
@@ -646,7 +649,8 @@ def QA_fetch_last_financial(
         # df.report_date = pd.to_datetime(df.report_date)
         # df.ann_date = pd.to_datetime(df.ann_date)
         # df.f_ann_date = pd.to_datetime(df.f_ann_date)
-        # return df.groupby("code").apply(lambda x: x.iloc[0])
+        if sheet_type == "balancesheet":
+            return df.groupby("code").apply(lambda x: x.iloc[0])
         return df.groupby("code").apply(_trans_financial_type).unstack()
 
 
@@ -853,7 +857,8 @@ def QA_fetch_daily_basic(
     code: Union[str, List, Tuple] = None,
     start: Union[str, pd.Timestamp, datetime.datetime] = None,
     end: Union[str, pd.Timestamp, datetime.datetime] = None,
-    cursor_date: Union[str, pd.Timestamp, datetime.datetime] = None
+    cursor_date: Union[str, pd.Timestamp, datetime.datetime] = None,
+    fields: Union[str, Tuple, List]= None
 ) -> pd.DataFrame:
     """获取全部股票每日重要的基本面指标，可用于选股分析、报表展示等
 
@@ -863,6 +868,7 @@ def QA_fetch_daily_basic(
         end (Union[str, pd.Timestamp, datetime.datetime], optional): 结束日期，默认为 None
         cursor_date (Union[str, pd.Timestamp, datetime.datetime], optional): 指定日期，与 start 和 end 冲突，只能选择 cursor_date
            或者 start, end
+        fields (Union[str, Tuple, List], optional): 指定 fields
 
     Returns:
         pd.DataFrame: 以日期，股票名为 Multiindex 的基本信息
@@ -928,7 +934,9 @@ def QA_fetch_daily_basic(
         columns="_id")
     df.date = pd.to_datetime(df.date)
     df = df.set_index(["date", "code"]).sort_index()
-    return df
+    if not fields:
+        return df
+    return df[fields]
 
 
 if __name__ == "__main__":
@@ -948,9 +956,12 @@ if __name__ == "__main__":
     #     code="000596", cursor_date="2020-10-08"))
     # print(QA_fetch_last_financial(
     #         code=QA_fetch_stock_list().index.tolist(), cursor_date="2020-10-08"))
-    print(QA_fetch_last_financial(
-            code = '000001', cursor_date = '2020-10-08'
-    ))
+    # print(QA_fetch_last_financial(
+    #         code = '000001', cursor_date = '2020-10-08'
+    # ))
+    code = QA_fetch_stock_list().index.tolist()
+    cursor_date = '2020-10-08'
+    df_origin = QA_fetch_last_financial(code = code, cursor_date = cursor_date, sheet_type = "balancesheet")
     # print(QA_fetch_last_financial(
     #     cursor_date="2018-08-31"))
     # print(QA_fetch_last_financial(
