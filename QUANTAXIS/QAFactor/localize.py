@@ -17,6 +17,7 @@ import tushare as ts
 from QUANTAXIS.QAFactor.fetcher import (REPORT_DATE_TAILS, REPORT_TYPE,
                                         SHEET_TYPE,
                                         QA_fetch_crosssection_financial,
+                                        QA_fetch_get_fina_indicator,
                                         QA_fetch_get_crosssection_financial,
                                         QA_fetch_get_daily_basic,
                                         QA_fetch_get_individual_financial,
@@ -336,6 +337,69 @@ def QA_ts_update_inc(wait_seconds: int = 61, max_trial=3) -> pd.DataFrame:
                 print(e)
 
 
+def QA_ts_fina_indicator_update_inc(wait_seconds: int = 61, max_trial=3) -> pd.DataFrame:
+    """
+    增量更新
+
+    :param wait_seconds: 等待时间
+    :param max_trial: 超时重试次数
+    ---
+    """
+
+    coll = eval(f"DATABASE.fina_indicator")
+    coll.create_index(
+        [
+            ("code", ASCENDING),
+            ("report_label", ASCENDING),  # 方便指定季报查询
+            ("report_date", ASCENDING),  # 方便进行最新报告期的查找
+            ("report_date_stamp", ASCENDING),
+            ("ann_date_stamp", ASCENDING),
+        ],
+        unique=False,
+    )
+
+    # 默认从 1990-01-01 开始
+    start = pd.Timestamp("1990-01-01")
+    end = pd.Timestamp(datetime.date.today())
+
+    ref = coll.find({})
+    cnt = coll.count()
+    if cnt > 0:
+        report_date = ref[cnt - 1]["report_date"]
+        start_year = report_date.year
+    else:
+        start_year = start.year
+
+    end_year = end.year
+    # 生成报告期列表
+    origin_report_dates = pd.Series(
+        [
+            pd.Timestamp(year + date_tail)
+            for year in pd.date_range(str(start_year), str(end_year + 1), freq="1Y")
+            .map(str)
+            .str.slice(0, 4)
+            for date_tail in REPORT_DATE_TAILS
+        ]
+    )
+    report_dates = origin_report_dates.loc[(origin_report_dates >= start) & (origin_report_dates <= end)]
+
+    # 对指定报告期列表进行循环
+    for report_date in report_dates:
+        df = QA_fetch_get_fina_indicator(
+            report_date=report_date.strftime("%Y%m%d"),
+            wait_seconds=wait_seconds,
+            max_trial=max_trial,
+        )
+        if not df.empty:
+            coll = eval(f"DATABASE.fina_indicator")
+            df = df.where(df.notnull(), None).reset_index()
+            df["report_date_stamp"] = df["report_date"].apply(QA_util_date_stamp)
+            df["ann_date_stamp"] = df["ann_date"].apply(QA_util_date_stamp)
+            js = QA_util_to_json_from_pandas(df)
+            coll.insert_many(js)
+
+
+
 def QA_ts_update_stock_basic():
     """
     本地化所有股票基本信息
@@ -545,4 +609,5 @@ if __name__ == "__main__":
     # QA_ts_update_industry()
     # QA_ts_update_stock_basic()
     # QA_ts_update_namechange()
-    QA_ts_update_daily_basic()
+    #QA_ts_update_daily_basic()
+    QA_ts_fina_indicator_update_inc()

@@ -41,7 +41,8 @@ from QUANTAXIS.QAFactor.localize import (QA_ts_update_daily_basic,
                                          QA_ts_update_inc,
                                          QA_ts_update_industry,
                                          QA_ts_update_namechange,
-                                         QA_ts_update_stock_basic)
+                                         QA_ts_update_stock_basic,
+                                         QA_ts_fina_indicator_update_inc)
 # 东方财富爬虫
 from QUANTAXIS.QASU.main import (QA_SU_crawl_eastmoney, QA_SU_save_bond_day,
                                  QA_SU_save_bond_list, QA_SU_save_bond_min,
@@ -495,6 +496,7 @@ class CLI(cmd.Cmd):
                         {"username": "admin", "password": "admin"}
                     )
                 QA_ts_update_inc()
+                QA_ts_fina_indicator_update_inc()
                 QA_ts_update_stock_basic()
                 QA_ts_update_namechange()
                 QA_ts_update_industry()

@@ -234,6 +234,69 @@ def QA_fetch_get_crosssection_financial(
         trial_count=0)
 
 
+def QA_fetch_get_fina_indicator(
+        report_date: Union[str, datetime.datetime, pd.Timestamp],
+        fields: Union[str, Tuple, List] = None,
+        wait_seconds: int = 61,
+        max_trial: int = 3) -> pd.DataFrame:
+    """截面获取上市公司财务指标数据网络查询接口
+
+    Args:
+        report_date (Union[str, datetime.datetime, pd.Timestamp]): 报告期
+        fields (Union[str, List], optional): 数据范围，默认为 None，返回所有数据.
+        wait_seconds (int, optional): 查询超时时间, 默认为 61.
+        max_trial (int, optional): 查询最大尝试次数, 默认为 3.
+
+    Returns:
+        pd.DataFrame: 指定报告期的指定财务报表数据
+    """
+    def _get_fina_indicator(report_date, fields, wait_seconds, trial_count):
+        nonlocal pro, max_trial
+        if trial_count >= max_trial:
+            raise ValueError("[ERROR]\tEXCEED MAX TRIAL!")
+        try:
+            if not fields:
+                print(
+                    f"pro.fina_indicator_vip(period='{report_date}')")
+                df = eval(
+                    f"pro.fina_indicator_vip(period='{report_date}')")
+            else:
+                df = eval(
+                    f"pro.fina_indicator_vip(period='{report_date}', fields={fields})")
+            if df.empty:
+                return df
+            df.ts_code = QA_fmt_code_list(df.ts_code)
+            return df.rename(columns={"ts_code": "code", "end_date": "report_date"}).sort_values(by=['ann_date'])
+        except Exception as e:
+            print(e)
+            time.sleep(wait_seconds)
+            _get_fina_indicator(
+                report_date, fields, wait_seconds, trial_count + 1)
+
+    # Tushare 账号配置
+    pro = get_pro()
+
+    # 设置标准报告期格式
+    report_date = pd.Timestamp(report_date)
+    year = report_date.year
+    std_report_dates = [
+        str(year) + report_date_tail for report_date_tail in REPORT_DATE_TAILS]
+
+    # Tushare 接口支持的日期格式
+    if report_date.strftime("%Y%m%d") not in std_report_dates:
+        raise ValueError("[REPORT_DATE ERROR]")
+
+    # fields 格式化处理
+    if isinstance(fields, str):
+        fields = sorted(list(set([fields, "ts_code", "end_date", "ann_date", "update_flag"])))
+
+    return _get_fina_indicator(
+        report_date=report_date.strftime("%Y%m%d"),
+        fields=fields,
+        wait_seconds=wait_seconds,
+        trial_count=0)
+
+
 # FIXME: Add Fetch Get Method of Daily Basic
 def QA_fetch_get_daily_basic(
         code: Union[str, List, Tuple] = None,
@@ -343,6 +406,7 @@ def QA_fetch_crosssection_financial(
     if not fields:
         return res.drop(columns="_id")
     return res.drop(columns="_id")[fields]
+
 
 
 def QA_fetch_financial_adv(
