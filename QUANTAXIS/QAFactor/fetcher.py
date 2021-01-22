@@ -510,6 +510,7 @@ def QA_fetch_financial_adv(
     cursor = coll.find(qry, batch_size=10000).sort([
         ("report_date_stamp", pymongo.ASCENDING),
         ("f_ann_date_stamp", pymongo.ASCENDING)])
+
     if fields:
         df = pd.DataFrame(cursor).drop(columns="_id")[fields].set_index("code")
         df.report_date = pd.to_datetime(df.report_date)
@@ -520,6 +521,91 @@ def QA_fetch_financial_adv(
         df.report_date = pd.to_datetime(df.report_date)
         df.ann_date = pd.to_datetime(df.ann_date)
         df.f_ann_date = pd.to_datetime(df.f_ann_date)
+    return df
+
+
+def QA_fetch_fina_indicator_adv(
+        code: Union[str, Tuple, List] = None,
+        start: Union[str, datetime.datetime, pd.Timestamp] = None,
+        end: Union[str, datetime.datetime, pd.Timestamp] = None,
+        report_date: Union[str, datetime.datetime, pd.Timestamp] = None,
+        fields: Union[str, Tuple, List] = None) -> pd.DataFrame:
+    """本地获取指定股票或者指定股票列表，指定时间范围或者报告期，指定报告类型的指定财务报表数据
+
+    Args:
+        code (Union[str, Tuple, List], optional): 指定股票代码或列表，默认为 None, 全市场股票
+        start (Union[str, datetime.datetime, pd.Timestamp], optional): 起始时间
+        end (Union[str, datetime.datetime, pd.Timestamp], optional): 结束时间
+        report_date (Union[str, datetime.datetime, pd.Timestamp], optional): 报告期
+        fields (List, optional): 字段，默认为 None，返回所有字段.
+
+    Returns:
+        pd.DataFrame: 指定条件的本地报表数据
+    """
+    if (not start) and (not end) and (not report_date):
+        raise ValueError(
+            "[DATE ERROR]\t 'start', 'end' 与 'report_date' 不能同时为 None")
+    if isinstance(code, str):
+        code = (code,)
+
+    coll = eval(f"DATABASE.fina_indicator")
+    qry = {}
+    if not report_date:
+        if not end:
+            end = datetime.date.today()
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
+        start_date_stamp = QA_util_date_stamp(start)
+        end_date_stamp = QA_util_date_stamp(end)
+        if not code:
+            qry = {
+                "ann_date_stamp": {
+                    "$gte": start_date_stamp,
+                    "$lte": end_date_stamp
+                }
+            }
+        else:
+            qry = {
+                "code": {
+                    "$in": code
+                },
+                "ann_date_stamp": {
+                    "$gte": start_date_stamp,
+                    "$lte": end_date_stamp
+                }
+            }
+    else:
+        report_date_stamp = QA_util_date_stamp(report_date)
+        if not code:
+            qry = {
+                "report_date_stamp": report_date_stamp
+            }
+        else:
+            qry = {
+                "code": {
+                    "$in": code
+                },
+                "report_date_stamp": report_date_stamp
+            }
+    if isinstance(fields, str):
+        fields = list(
+            set([fields, "code", "ann_date", "report_date", "ann_date"]))
+    elif fields:
+        fields = list(
+            set(list(fields) + ["code", "ann_date", "report_date", "ann_date"]))
+
+    cursor = coll.find(qry, batch_size=10000).sort([
+        ("report_date_stamp", pymongo.ASCENDING),
+        ("ann_date_stamp", pymongo.ASCENDING)])
+
+    if fields:
+        df = pd.DataFrame(cursor).drop(columns="_id")[fields].set_index("code")
+        df.report_date = pd.to_datetime(df.report_date)
+        df.ann_date = pd.to_datetime(df.ann_date)
+    else:
+        df = pd.DataFrame(cursor).drop(columns="_id").set_index("code")
+        df.report_date = pd.to_datetime(df.report_date)
+        df.ann_date = pd.to_datetime(df.ann_date)
     return df
 
 
@@ -656,11 +742,12 @@ def QA_fetch_last_financial(
             if not fields:
                 df = pd.DataFrame(cursor).drop(columns="_id")
             else:
-                df = pd.DataFrame(cursor).drop(columns="_id")[fields]
+                df = pd.DataFrame(cursor).drop(columns="_id")
+                df = df[fields]
         except:
             raise ValueError("[QRY ERROR]")
         if sheet_type == "balancesheet":
-            return df.groupby("code").apply(lambda x: x.iloc[0])
+            return df.groupby("code").apply(lambda x: x.iloc[0]) 
         return df.groupby("code").apply(_trans_financial_type).unstack()
     if not code:
         qry = {
@@ -1010,9 +1097,11 @@ if __name__ == "__main__":
     #      "000001", report_date="2020-03-31", fields="basic_eps"))
     # print(QA_fetch_get_crosssection_financial('2020-03-31'))
     # print(QA_fetch_crosssection_financial("2020-03-31", fields="basic_eps"))
-    # df = QA_fetch_financial_adv(start="2018-06-30", end="2018-09-30")
-    # print(df.loc['000528', ["report_date", "f_ann_date",
-    #                         "ann_date", "basic_eps", "report_type", "update_flag", "report_label"]])
+    # df = QA_fetch_financial_adv(code=['600030'], start="2018-06-30", end="2018-09-30", sheet_type='cashflow', fields=['n_cashflow_act'])
+    # df = QA_fetch_financial_adv(code=['600030'], start="2017-01-01", end="2017-04-04", sheet_type='cashflow',
+    #                             fields='n_cashflow_act')
+    # # print(df.loc['000528', ["report_date", "f_ann_date",
+    # #                         "ann_date", "basic_eps", "report_type", "update_flag", "report_label"]])
     # print(df)
     # print(QA_fetch_stock_basic(status="D"))
     # 最近财务数据获取测试
@@ -1023,13 +1112,19 @@ if __name__ == "__main__":
     # print(QA_fetch_last_financial(
     #         code = '000001', cursor_date = '2020-10-08'
     # ))
-    code = QA_fetch_stock_list().index.tolist()
-    cursor_date = '2020-10-08'
-    df_origin = QA_fetch_last_financial(code = code, cursor_date = cursor_date, sheet_type = "balancesheet")
+    # code = QA_fetch_stock_list().index.tolist()
+    # cursor_date = '2020-10-08'
+    # df_origin = QA_fetch_last_financial(code = code, cursor_date = cursor_date, sheet_type = "balancesheet")
     # print(QA_fetch_last_financial(
     #     cursor_date="2018-08-31"))
-    # print(QA_fetch_last_financial(
-    #     cursor_date="2018-08-31", code=["000528"], fields=["report_date", "ann_date", "f_ann_date", "update_flag"]))
+    print(QA_fetch_last_financial(
+        cursor_date="2018-08-31", code=["000528"], fields=['total_profit', 'report_type']))
+    print('-------------------------------------------------------')
+    print(QA_fetch_last_financial(
+        cursor_date="2018-09-30", code=["000528"], fields=['total_profit', 'report_type']))
+    print('-------------------------------------------------------')
+    print(QA_fetch_last_financial(
+        cursor_date=" 2019-08-31", code=["000528"], fields=['total_profit', 'report_type']))
     # print(QA_fetch_financial_adv(
     #     cursor_date="2018-08-31"))
     # 股票基本信息获取测试
