@@ -747,7 +747,7 @@ def QA_fetch_last_financial(
         except:
             raise ValueError("[QRY ERROR]")
         if sheet_type == "balancesheet":
-            return df.groupby("code").apply(lambda x: x.iloc[0]) 
+            return df.groupby("code").apply(lambda x: x.iloc[0])
         return df.groupby("code").apply(_trans_financial_type).unstack()
     if not code:
         qry = {
